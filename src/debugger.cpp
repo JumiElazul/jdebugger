@@ -1,10 +1,12 @@
 #include "debugger.h"
 #include "linenoise.h"
+#include <algorithm>
 #include <iostream>
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
 #include <sys/ptrace.h>
+#include <sys/user.h>
 
 debugger::debugger(std::string prog_name, pid_t pid)
     : _prog_name{std::move(prog_name)}, _pid{pid}, _quit(false), _breakpoints() {}
@@ -53,6 +55,27 @@ void debugger::set_breakpoint_at_address(std::intptr_t addr) {
     _breakpoints[addr] = bp;
 }
 
+void debugger::delete_breakpoint_at_address(std::intptr_t addr) {
+    auto find = _breakpoints.find(addr);
+    if (find != _breakpoints.end()) {
+        std::cout << "Deleting breakpoint at address 0x" << std::hex << addr << '\n';
+        breakpoint& bp = find->second;
+        bp.disable();
+        return;
+    }
+    std::cout << "Breakpoint at address 0x" << std::hex << addr << " not found to delete.\n";
+}
+
+std::uint64_t debugger::get_register_value(pid_t pid, reg r) {
+    user_regs_struct regs;
+    ptrace(PTRACE_GETREGS, pid, nullptr, &regs);
+
+    auto it = std::find_if(std::begin(g_register_descriptors), std::end(g_register_descriptors),
+            [r](auto&& rd) { return rd.r == r; });
+
+    return *(reinterpret_cast<uint64_t*>(&regs) + (it - begin(g_register_descriptors)));
+}
+
 void debugger::handle_command(const std::string& line) {
     auto args = split(line, ' ');
     auto command = args[0];
@@ -62,6 +85,9 @@ void debugger::handle_command(const std::string& line) {
     } else if (is_prefix(command, "break")) {
         std::string addr{args[1], 2}; //naively assume that the user has written 0xADDRESS
         set_breakpoint_at_address(std::stol(addr, 0, 16));
+    } else if (is_prefix(command, "del")) {
+        std::string addr{args[1], 2};
+        delete_breakpoint_at_address(std::stol(addr, 0, 16));
     } else if (is_prefix(command, "quit")) {
         quit();
     } else {

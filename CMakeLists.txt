@@ -16,6 +16,7 @@ set(DEBUGGER_SOURCES
     "src/breakpoint.h"
     "src/debugger.cpp"
     "src/debugger.h"
+    "src/registers.h"
 )
 
 include(FetchContent)
