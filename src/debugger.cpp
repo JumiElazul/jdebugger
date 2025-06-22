@@ -1,13 +1,13 @@
 #include "debugger.h"
+#include "linenoise.h"
 #include <iostream>
-#include <linenoise.h>
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
 #include <sys/ptrace.h>
 
 debugger::debugger(std::string prog_name, pid_t pid)
-    : _prog_name{std::move(prog_name)}, _pid{pid}, _quit(false) {}
+    : _prog_name{std::move(prog_name)}, _pid{pid}, _quit(false), _breakpoints() {}
 
 static std::vector<std::string> split(const std::string& s, char delimiter) {
     std::vector<std::string> out;
@@ -46,12 +46,22 @@ void debugger::run() {
     }
 }
 
+void debugger::set_breakpoint_at_address(std::intptr_t addr) {
+    std::cout << "Set breakpoint at address 0x" << std::hex << addr << '\n';
+    breakpoint bp{_pid, addr};
+    bp.enable();
+    _breakpoints[addr] = bp;
+}
+
 void debugger::handle_command(const std::string& line) {
     auto args = split(line, ' ');
     auto command = args[0];
 
-    if (is_prefix(command, "continue")) {
+    if (is_prefix(command, "cont")) {
         continue_execution();
+    } else if (is_prefix(command, "break")) {
+        std::string addr{args[1], 2}; //naively assume that the user has written 0xADDRESS
+        set_breakpoint_at_address(std::stol(addr, 0, 16));
     } else if (is_prefix(command, "quit")) {
         quit();
     } else {

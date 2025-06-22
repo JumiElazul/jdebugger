@@ -1,7 +1,7 @@
-#include <cerrno>
 #include <iostream>
 #include <unistd.h>
 #include <sys/ptrace.h>
+#include <sys/personality.h>
 #include "debugger.h"
 
 int main(int argc, char* argv[]) {
@@ -21,6 +21,7 @@ int main(int argc, char* argv[]) {
             std::cerr << "ptrace failed\n";
             return -1;
         }
+        personality(ADDR_NO_RANDOMIZE);
         execl(prog, prog, nullptr);
     }
     else if (pid >= 1) {

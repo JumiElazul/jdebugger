@@ -12,6 +12,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(DEBUGGER_SOURCES
     "src/main.cpp"
 
+    "src/breakpoint.cpp"
+    "src/breakpoint.h"
     "src/debugger.cpp"
     "src/debugger.h"
 )
