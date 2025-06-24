@@ -23,16 +23,36 @@ include(FetchContent)
 
 FetchContent_Declare(linenoise
     GIT_REPOSITORY "https://github.com/antirez/linenoise.git"
-    SYSTEM
 )
+FetchContent_MakeAvailable(linenoise)
 
 FetchContent_Declare(libelfin
     GIT_REPOSITORY "https://github.com/TartanLlama/libelfin.git"
-    SYSTEM
+)
+FetchContent_MakeAvailable(libelfin)
+
+FetchContent_Declare(glfw
+    GIT_REPOSITORY "https://github.com/glfw/glfw.git"
+    GIT_TAG         3.4
+)
+FetchContent_MakeAvailable(glfw)
+
+FetchContent_Declare(glad
+    GIT_REPOSITORY "https://github.com/Dav1dde/glad.git"
+    GIT_TAG        "v2.0.8"
+    SOURCE_SUBDIR  "cmake"
+)
+FetchContent_MakeAvailable(glad)
+
+glad_add_library(
+  glad
+  STATIC
+  REPRODUCIBLE
+  LOADER
+  API gl:core=4.6
 )
 
 message(STATUS "Calling FetchContent_MakeAvailable on linenoise...")
-FetchContent_MakeAvailable(linenoise libelfin)
 
 file(GLOB LIBELFIN_SOURCES
     "${libelfin_SOURCE_DIR}/elf/*.cc"
@@ -53,7 +73,10 @@ target_include_directories(libelfin PUBLIC
 )
 
 add_executable(debugger ${DEBUGGER_SOURCES})
-target_link_libraries(debugger PRIVATE linenoise libelfin)
+target_link_libraries(debugger PRIVATE linenoise libelfin glfw glad)
+
+target_compile_definitions(debugger PRIVATE GLFW_INCLUDE_NONE)
+
 target_compile_options(debugger PRIVATE
     -ggdb -g
     -Wall -Wextra -Wconversion -Wsign-conversion
@@ -61,6 +84,7 @@ target_compile_options(debugger PRIVATE
     -pedantic-errors
     -fsanitize=address -fsanitize=undefined
 )
+
 target_link_options(debugger PRIVATE
     -fsanitize=address -fsanitize=undefined
 )
