@@ -45,11 +45,11 @@ FetchContent_Declare(glad
 FetchContent_MakeAvailable(glad)
 
 glad_add_library(
-  glad
-  STATIC
-  REPRODUCIBLE
-  LOADER
-  API gl:core=4.6
+    glad
+    STATIC
+    REPRODUCIBLE
+    LOADER
+    API gl:core=4.6
 )
 
 message(STATUS "Calling FetchContent_MakeAvailable on linenoise...")
