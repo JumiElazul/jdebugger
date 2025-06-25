@@ -14,6 +14,7 @@ set(DEBUGGER_SOURCES
 
     "src/breakpoint.cpp"
     "src/breakpoint.h"
+    "src/common.h"
     "src/debugger.cpp"
     "src/debugger.h"
     "src/registers.h"

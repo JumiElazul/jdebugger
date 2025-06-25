@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <iostream>
 #include <unistd.h>
 #include <sys/ptrace.h>
@@ -7,6 +8,11 @@
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cerr << "Program name not specified\n";
+        return -1;
+    }
+
+    if (!std::filesystem::exists(argv[1])) {
+        std::cerr << "Program name doesn't exist\n";
         return -1;
     }
 

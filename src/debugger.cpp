@@ -1,7 +1,9 @@
 #include "debugger.h"
 #include "linenoise.h"
+#include "registers.h"
 #include <algorithm>
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
@@ -66,14 +68,66 @@ void debugger::delete_breakpoint_at_address(std::intptr_t addr) {
     std::cout << "Breakpoint at address 0x" << std::hex << addr << " not found to delete.\n";
 }
 
-std::uint64_t debugger::get_register_value(pid_t pid, reg r) {
+uint64_t debugger::get_register_value(pid_t pid, reg r) {
     user_regs_struct regs;
     ptrace(PTRACE_GETREGS, pid, nullptr, &regs);
 
-    auto it = std::find_if(std::begin(g_register_descriptors), std::end(g_register_descriptors),
+    auto it = std::find_if(g_register_descriptors.begin(), g_register_descriptors.end(),
             [r](auto&& rd) { return rd.r == r; });
 
+    // 1. Cast &regs -> uint64_t* so we can do word indexed access.
+    // 2. Compute the index of the requested register in the g_register_descriptors array.
+    // 3. Offset the pointer &regs by that index.
+    // 4. Dereference it to get the 64-bit register value.
     return *(reinterpret_cast<uint64_t*>(&regs) + (it - begin(g_register_descriptors)));
+}
+
+void debugger::set_register_value(pid_t pid, reg r, uint64_t value) {
+    user_regs_struct regs;
+    ptrace(PTRACE_GETREGS, pid, nullptr, &regs);
+
+    auto it = std::find_if(g_register_descriptors.begin(), g_register_descriptors.end(),
+            [r](auto&& rd) { return rd.r == r; });
+
+    // 1. Cast &regs -> uint64_t* so we can do word indexed access.
+    // 2. Compute the index of the requested register in the g_register_descriptors array.
+    // 3. Offset the pointer &regs by that index.
+    // 4. Dereference it to get the 64-bit register value, and assign it the new value.
+    *(reinterpret_cast<uint64_t*>(&regs) + (it - begin(g_register_descriptors))) = value;
+    ptrace(PTRACE_SETREGS, pid, nullptr, &regs);
+}
+
+uint64_t debugger::get_register_value_from_dwarf_register(pid_t pid, int regnum) {
+    auto it = std::find_if(g_register_descriptors.begin(), g_register_descriptors.end(), 
+            [regnum](auto&& rd) { return rd.dwarf_r == regnum; });
+
+    return get_register_value(pid, it->r);
+}
+
+std::string debugger::get_register_name(reg r) {
+    auto it = std::find_if(g_register_descriptors.begin(), g_register_descriptors.end(),
+            [r](auto&& rd) { return rd.r == r; });
+
+    return it->name;
+}
+
+reg debugger::get_register_from_name(const std::string& name) {
+    auto it = std::find_if(g_register_descriptors.begin(), g_register_descriptors.end(),
+            [&name](auto&& rd) { return rd.name == name; });
+
+    return it->r;
+}
+
+void debugger::dump_registers() {
+    for (const auto& rd : g_register_descriptors) {
+        std::cout             <<
+            rd.name           <<
+            " 0x"             << 
+            std::setfill('0') <<
+            std::setw(16)     <<
+            std::hex          <<
+            get_register_value(_pid, rd.r) << '\n';
+    }
 }
 
 void debugger::handle_command(const std::string& line) {
@@ -82,6 +136,15 @@ void debugger::handle_command(const std::string& line) {
 
     if (is_prefix(command, "cont")) {
         continue_execution();
+    } else if (is_prefix(command, "register")) {
+        if (is_prefix(args[1], "dump")) {
+            dump_registers();
+        } else if (is_prefix(args[1], "read")) {
+            std::cout << get_register_value(_pid, get_register_from_name(args[2])) << '\n';
+        } else if (is_prefix(args[1], "write")) {
+            std::string val { args[3], 2 };
+            set_register_value(_pid, get_register_from_name(args[2]), std::stoull(val, 0, 16ULL));
+        }
     } else if (is_prefix(command, "break")) {
         std::string addr{args[1], 2}; //naively assume that the user has written 0xADDRESS
         set_breakpoint_at_address(std::stol(addr, 0, 16));
